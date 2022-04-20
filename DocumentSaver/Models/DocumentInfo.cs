@@ -13,6 +13,8 @@ namespace DocumentSaver.Models
 
         public string DocumentContent { get; set; }
 
+        public string Case { get; set; }
+
         public DateTime DateSubmitted  { get; set; }
 
         public DateTime DateModified { get; set; }

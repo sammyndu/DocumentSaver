@@ -1,4 +1,8 @@
+using DocumentSaver.Authorization;
 using DocumentSaver.Data;
+using DocumentSaver.Extensions;
+using DocumentSaver.Helpers;
+using DocumentSaver.Models;
 using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,6 +20,7 @@ builder.Services.AddCors(options =>
                       });
 });
 
+
 builder.WebHost.ConfigureKestrel(serverOptions =>
 {
     serverOptions.Listen(IPAddress.Any, Convert.ToInt32(Environment.GetEnvironmentVariable("PORT"))); ;
@@ -26,6 +31,9 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddDataDependencies();
+// configure strongly typed settings object
+builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("AppSettings"));
 
 
 var app = builder.Build();
@@ -40,6 +48,12 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseCors(MyAllowSpecificOrigins);
+
+// global error handler
+app.UseMiddleware<ErrorHandlerMiddleware>();
+
+// custom jwt auth middleware
+app.UseMiddleware<JwtMiddleware>();
 
 app.UseAuthorization();
 

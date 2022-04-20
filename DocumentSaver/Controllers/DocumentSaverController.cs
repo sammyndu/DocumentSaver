@@ -1,5 +1,8 @@
-﻿using DocumentSaver.Data;
+﻿using DocumentSaver.Authorization;
+using DocumentSaver.Data;
+using DocumentSaver.Data.Entities;
 using DocumentSaver.Models;
+using DocumentSaver.Services;
 using Microsoft.AspNetCore.Mvc;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -8,55 +11,85 @@ namespace DocumentSaver.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class DocumentSaverController : ControllerBase
+    public class DocumentSaverController : BaseController
     {
         private readonly AppDbContext _db;
-        public DocumentSaverController(AppDbContext db)
+
+        private ILogService _logService;
+        public DocumentSaverController(AppDbContext db, ILogService logService)
         {
             _db = db;
+            _logService = logService;
         }
         // GET: api/<DocumentSaverController>
+        [Authorize(Role.Admin, Role.Report)]
+        //[AllowAnonymous]
         [HttpGet]
-        public IActionResult Get()
+        public async Task<IActionResult> Get()
         {
-            var documents = _db.DocumentInfo.ToList();
-            return Ok(documents);
-        }
+            User user;
+            List<DocumentInfo> documents;
+            var result = new Result<List<DocumentInfo>>();
+            try
+            {
+                user = GetAuthorizedUser();
 
-        // GET api/<DocumentSaverController>/5
-        [HttpGet("{id}")]
-        public string Get(int id)
-        {
-            return "value";
+                await _logService.AddLog(user.Username, "Reports");
+
+                documents = _db.DocumentInfo.ToList();
+                result.Content = documents;
+
+            } catch(Exception ex)
+            {
+                result.Error = PopulateError(500, ex.Message, "Server Error");
+            }
+
+            return Ok(result);
         }
 
         // POST api/<DocumentSaverController>
+        [Authorize(Role.Admin, Role.Scan)]
         [HttpPost]
-        public IActionResult Post([FromBody] DocumentInfo data)
+        public async Task<IActionResult> Post([FromBody] DocumentInfo data)
         {
+            User user;
+            var result = new Result<DocumentInfo>();
+
             try
             {
+                user = GetAuthorizedUser();
+                await _logService.AddLog(user.Username, "Add Scan");
+
                 data.DateModified = DateTime.Now;
                 data.DateSubmitted = DateTime.Now;
                 data.DocumentId = data.DocumentId.ToUpper();
                 data.DocumentName = data.DocumentName.Trim();
                 _db.DocumentInfo.Add(data);
                 _db.SaveChanges();
-                return Ok(data);
+
+                result.Content = data;
             }
             catch (Exception ex)
             {
-                return Ok(ex.Message);
+                result.Error = PopulateError(500, ex.Message, "Server Error");
             }
-           
+
+            return Ok(result);
+
         }
 
-
+        [Authorize(Role.Admin, Role.Search)]
         [HttpPost("search")]
-        public IActionResult Search([FromBody] SearchDocument data)
+        public async Task<IActionResult> Search([FromBody] SearchDocument data)
         {
+            User user;
+            var response = new Result<List<DocumentInfo>>();
+
             try
             {
+                user = GetAuthorizedUser();
+                await _logService.AddLog(user.Username, "Search");
+
                 var query = _db.DocumentInfo.AsQueryable();
                 if(!String.IsNullOrEmpty(data.DocumentId))
                 {
@@ -74,41 +107,83 @@ namespace DocumentSaver.Controllers
                 }
 
                 var result = query.ToList();
-                return Ok(result);
+                response.Content = result;
             }
             catch (Exception ex)
             {
-                return Ok(ex.Message);
+                response.Error = PopulateError(500, ex.Message, "Server Error");
             }
+
+            return Ok(response);
 
         }
 
         // PUT api/<DocumentSaverController>/5
+        [Authorize(Role.Admin, Role.Scan)]
         [HttpPut("{id}")]
-        public IActionResult Put(long id, [FromBody] DocumentInfo data)
+        public async Task<IActionResult> Put(long id, [FromBody] DocumentInfo data)
         {
-            var entity = _db.DocumentInfo.Where(x => x.Id == id).FirstOrDefault();
+            User user;
+            var result = new Result<DocumentInfo>();
 
-            entity.DocumentName = data.DocumentName;
-            entity.DocumentContent = String.IsNullOrEmpty(data.DocumentContent) ? data.DocumentContent : entity.DocumentContent;
-            entity.DateModified = DateTime.Now;
-            _db.DocumentInfo.Update(entity);
-            _db.SaveChanges();
+            try
+            {
+                user = GetAuthorizedUser();
+                await _logService.AddLog(user.Username, "Update Scan");
+
+                var entity = _db.DocumentInfo.Where(x => x.Id == id).FirstOrDefault();
+
+                entity.DocumentName = data.DocumentName;
+                entity.DocumentContent = !String.IsNullOrEmpty(data.DocumentContent) ? data.DocumentContent : entity.DocumentContent;
+                entity.DateModified = DateTime.Now;
+                _db.DocumentInfo.Update(entity);
+                _db.SaveChanges();
+
+                result.Content = entity;
+                    
+            } catch(Exception ex)
+            {
+                result.Error = PopulateError(500, ex.Message, "Server Error");
+            }
+            
             return Ok(data);
         }
 
         // DELETE api/<DocumentSaverController>/5
+        [Authorize(Role.Admin, Role.Report)]
         [HttpDelete("{id}")]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var entity = _db.DocumentInfo.Where(x => x.Id == id).FirstOrDefault();
-            if(entity != null)
+            User user;
+            var result = new Result<DocumentInfo>();
+            DocumentInfo entity;
+            try
             {
+                user = GetAuthorizedUser();
+                await _logService.AddLog(user.Username, "Delete");
+
+                entity = _db.DocumentInfo.Where(x => x.Id == id).FirstOrDefault();
+                if (entity == null)
+                {
+                    result.Error = PopulateError(400, "Document does not exist", "Error");
+                    return BadRequest("Document does not exist");
+                }
                 _db.DocumentInfo.Remove(entity);
                 _db.SaveChanges();
-                return Ok(entity);
+
             }
-            return BadRequest("Document doe not exist");
+            catch (Exception ex)
+            {
+                result.Error = PopulateError(500, ex.Message, "Server Error");
+            }
+            return Ok(result);
+        }
+
+        private User GetAuthorizedUser()
+        {
+            var currentUser = (User)HttpContext.Items["User"];
+
+            return currentUser;
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using DocumentSaver.Models;
+﻿using DocumentSaver.Data.Entities;
+using DocumentSaver.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace DocumentSaver.Data
@@ -22,10 +23,16 @@ namespace DocumentSaver.Data
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
             // connect to sql server database
-            options.UseSqlite(Configuration.GetConnectionString("DbConnection"));
+            //options.UseSqlite(Configuration.GetConnectionString("DbConnection"));
+
+            options.UseSqlServer(Configuration.GetConnectionString("DbConnection"));
         }
 
         public DbSet<DocumentInfo> DocumentInfo { get; set; }
+
+        public DbSet<User> Users { get; set; }
+
+        public DbSet<Log> Logs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
