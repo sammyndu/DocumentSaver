@@ -39,6 +39,8 @@ namespace DocumentSaver.Services;
         {
             var user = _context.Users.SingleOrDefault(x => x.Username == model.Username);
 
+
+
             // validate
             if (user == null || !BCrypt.Net.BCrypt.Verify(model.Password, user.PasswordHash))
                 throw new AppException("Username or password is incorrect");

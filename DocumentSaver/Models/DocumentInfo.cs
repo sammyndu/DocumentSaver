@@ -18,5 +18,11 @@ namespace DocumentSaver.Models
         public DateTime DateSubmitted  { get; set; }
 
         public DateTime DateModified { get; set; }
+
+        public string? CreatedBy { get; set; }
+
+        public DateTime? FormDate { get; set; }
+
+        public bool New { get; set; }
     }
 }

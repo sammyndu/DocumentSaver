@@ -25,7 +25,12 @@ namespace DocumentSaver.Data
             // connect to sql server database
             //options.UseSqlite(Configuration.GetConnectionString("DbConnection"));
 
-            options.UseSqlServer(Configuration.GetConnectionString("DbConnection"));
+            options.UseSqlServer(Configuration.GetConnectionString("DbConnection"), options => options.EnableRetryOnFailure(
+                        maxRetryCount: 10,
+                        maxRetryDelay: TimeSpan.FromSeconds(30),
+                        errorNumbersToAdd: null
+                        ));
+
         }
 
         public DbSet<DocumentInfo> DocumentInfo { get; set; }
